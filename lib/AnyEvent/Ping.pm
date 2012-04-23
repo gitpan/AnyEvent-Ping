@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use 5.008_001;
 
-our $VERSION = 0.001;
+our $VERSION = 0.002;
 
 use Socket qw/SOCK_RAW/;
 use Time::HiRes 'time';
@@ -56,9 +56,9 @@ sub new {
     return $self;
 }
 
-sub interval { @_ > 2 ? $_[0]->{interval} = $_[1] : $_[0]->{interval} }
+sub interval { @_ > 1 ? $_[0]->{interval} = $_[1] : $_[0]->{interval} }
 
-sub timeout { @_ > 2 ? $_[0]->{timeout} = $_[1] : $_[0]->{timeout} }
+sub timeout { @_ > 1 ? $_[0]->{timeout} = $_[1] : $_[0]->{timeout} }
 
 sub error { $_[0]->{error} }
 
