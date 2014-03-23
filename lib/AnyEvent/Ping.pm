@@ -4,13 +4,12 @@ use strict;
 use warnings;
 use 5.008_001;
 
-our $VERSION = 0.003;
+our $VERSION = 0.004;
 
 use Socket qw/SOCK_RAW/;
 use Time::HiRes 'time';
 use IO::Socket::INET qw/sockaddr_in inet_aton/;
 use List::Util ();
-use AnyEvent::Handle;
 require Carp;
 
 my $ICMP_PING = 'ccnnnA*';
@@ -85,6 +84,16 @@ sub ping {
     $self->_add_write_poll;
 
     return $self;
+}
+
+sub end {
+    my $self = shift;
+
+    delete $self->{_poll_read};
+    delete $self->{_poll_write};
+
+    close delete $self->{_socket}
+        if exists $self->{_socket};
 }
 
 sub _add_write_poll {
@@ -286,6 +295,7 @@ AnyEvent::Ping - ping hosts with AnyEvent
     });
 
     $c->recv;
+    $ping->end;
 
 =head1 DESCRIPTION
 
@@ -327,6 +337,12 @@ L<AnyEvent::Ping> implements the following methods.
 
 Perform a ping of a given $ip address $n times.
 
+=head2 C<end>
+
+    $ping->end;
+
+Ends all pings and releases resources.
+
 =head1 SEE ALSO
 
 L<AnyEvent>, L<AnyEvent::FastPing>
@@ -335,9 +351,13 @@ L<AnyEvent>, L<AnyEvent::FastPing>
 
 Sergey Zasenko, C<undef@cpan.org>.
 
+=head1 CREDITS
+
+Kirill (qsimpleq)
+
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012, Sergey Zasenko
+Copyright (C) 2012-2014, Sergey Zasenko
 
 This program is free software, you can redistribute it and/or modify it under
 the same terms as Perl 5.12.
