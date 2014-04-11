@@ -12,7 +12,10 @@ plan skip_all => 'You can run tests just as root' if $<;
 
 use_ok 'AnyEvent::Ping';
 
-my $ping = new_ok 'AnyEvent::Ping' => [timeout => 1];
+my $ping = new_ok 'AnyEvent::Ping' => [
+    timeout    => 1,
+    on_prepare => \&on_prepare
+];
 
 subtest 'ping 127.0.0.1' => sub {
     my $result;
@@ -83,6 +86,23 @@ subtest 'ping broadcast' => sub {
     done_testing;
 };
 
+subtest 'preparation socket' => sub {
+    our $preparation_socket;
+    isa_ok($preparation_socket, 'IO::Socket');
+};
+
+subtest 'data generation' => sub {
+    my $size = 20;
+    my $data = AnyEvent::Ping::generate_data_random(20);
+
+    is length($data), $size, 'random data generated right size';
+};
+
 $ping->end;
 
 done_testing;
+exit;
+
+sub on_prepare {
+    our $preparation_socket = shift;
+}

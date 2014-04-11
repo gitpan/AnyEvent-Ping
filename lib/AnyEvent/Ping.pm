@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use 5.008_001;
 
-our $VERSION = 0.004;
+our $VERSION = 0.005;
 
 use Socket qw/SOCK_RAW/;
 use Time::HiRes 'time';
@@ -30,7 +30,21 @@ sub new {
     my $timeout = $args{timeout};
     $timeout = 5 unless defined $timeout;
 
-    my $self = bless {interval => $interval, timeout => $timeout}, $class;
+    my $packet_generator = $args{packet_generator};
+    unless (defined $packet_generator) {
+        my $packet_size = $args{packet_size};
+        $packet_size = 56 unless defined $packet_size;
+
+        $packet_generator = sub {
+            &AnyEvent::Ping::generate_data_random($packet_size);
+        };
+    }
+
+    my $self = bless {
+        interval       => $interval,
+        timeout        => $timeout,
+        packet_generator => $packet_generator
+    }, $class;
 
     # Create RAW socket
     my $socket = IO::Socket::INET->new(
@@ -40,6 +54,10 @@ sub new {
     ) or Carp::croak "Unable to create icmp socket : $!";
 
     $self->{_socket} = $socket;
+
+    if (my $on_prepare = $args{on_prepare}) {
+        $on_prepare->($socket);
+    }
 
     # Create Poll object
     $self->{_poll_read} = AnyEvent->io(
@@ -94,6 +112,18 @@ sub end {
 
     close delete $self->{_socket}
         if exists $self->{_socket};
+}
+
+sub generate_data_random {
+    my $length = shift;
+
+    my $data = '';
+    while ($length > 0) {
+        $data .= pack('C', int(rand(256)));
+        $length--;
+    }
+
+    $data;
 }
 
 sub _add_write_poll {
@@ -221,7 +251,7 @@ sub _send_request {
     my $checksum   = 0x0000;
     my $identifier = $request->{identifier};
     my $sequence   = @{$request->{results}} + 1;
-    my $data       = 'abcdef';
+    my $data       = $self->{packet_generator}->();
 
     my $msg = pack $ICMP_PING,
       $ICMP_ECHO, 0x00, $checksum,
@@ -328,6 +358,48 @@ Last error message.
 =head1 METHODS
 
 L<AnyEvent::Ping> implements the following methods.
+
+=head2 C<new>
+
+    my $ping = AnyEvent::Ping->new(%options)
+
+Constructs AnyEvent::Ping object. Following options can be passed:
+
+=head3 C<interval>
+
+=head3 C<timeout>
+
+=head3 C<on_prepare>
+
+In some cases you need to "tune" the socket before it is used to ping (for
+exmaple, to bind it on a given IP address).
+
+    my $ping = AnyEvent::Ping->new(
+        on_prepare => sub {
+            my $socket = shift;
+            ...
+    });
+
+=head3 C<packet_generator>
+
+Generates the data to be sent.
+
+    my $ping = AnyEvent::Ping->new(
+        packet_generator => sub {
+            &AnyEvent::Ping::generate_data_random($packet_size);
+    });
+
+=head3 C<packet_size>
+
+You can set the number of data bytes to be sent, if packet generation function
+is not set. The default is 54, which translates into 64 ICMP data bytes when
+combined with the 8 bytes of ICMP header data.
+
+    my $ping = AnyEvent::Ping->new(packet_size => 54);
+
+Each packet will be generated with generate_data_random() like this:
+
+    &AnyEvent::Ping::generate_data_random($packet_size);
 
 =head2 C<ping>
 
